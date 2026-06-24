@@ -34,13 +34,31 @@ jobs:
 
       - name: Publish gh-pages branch
         run: |
-          cd dist
-          git init -b gh-pages
+          work_dir="$(mktemp -d)"
+          if git clone --depth=1 --branch gh-pages "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$work_dir"; then
+            :
+          else
+            git init -b gh-pages "$work_dir"
+            git -C "$work_dir" remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          fi
+
+          find "$work_dir" -mindepth 1 -maxdepth 1 \
+            ! -name .git \
+            ! -name previews \
+            -exec rm -rf {} +
+
+          cp -R dist/. "$work_dir"/
+          touch "$work_dir/.nojekyll"
+
+          cd "$work_dir"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add .
+          if git diff --cached --quiet; then
+            echo "No Pages changes to publish."
+            exit 0
+          fi
           git commit -m "Deploy GitHub Pages"
-          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          git push --force origin gh-pages
+          git push origin gh-pages
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
