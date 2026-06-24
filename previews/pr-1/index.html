@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shadow Box Quilt Designer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .quilt-container {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            background-color: #f8fafc;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.1);
+        }
+
+        .piece-shape {
+            stroke: rgba(255, 255, 255, 0.6);
+            stroke-width: 4;
+            stroke-dasharray: 12, 12;
+            cursor: pointer;
+            transition: stroke 0.2s, stroke-width 0.2s; /* smooth transition */
+        }
+
+        @keyframes marching-ants {
+            from { stroke-dashoffset: 0; }
+            to { stroke-dashoffset: -30; }
+        }
+
+        .piece-shape.marquee {
+            stroke: #fbbf24; /* Amber-400 */
+            stroke-width: 8;
+            stroke-dasharray: 15, 15;
+            animation: marching-ants 0.8s linear infinite;
+        }
+
+        #pansy-overlay {
+            position: absolute;
+            bottom: 0; right: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: rgba(255,255,255,0.9);
+            font-weight: 600;
+            text-align: center;
+            pointer-events: none; /* Let clicks/hovers pass through to SVG */
+        }
+    </style>
+</head>
+<body class="bg-slate-100 min-h-screen text-slate-800 p-4 md:p-8 font-sans">
+    <div class="max-w-5xl mx-auto bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="bg-slate-800 text-white p-6">
+            <h2 class="text-2xl font-bold">Shadow Box Quilt Designer</h2>
+            <p class="text-slate-300 text-sm mt-1">Adjust the slider to dynamically calculate your cut sizes.</p>
+        </div>
+
+        <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
+            <!-- Controls & Table -->
+            <div class="flex flex-col gap-6">
+                <div class="bg-slate-50 p-5 rounded-lg border border-slate-200">
+                    <label for="blueSlider" class="block font-bold text-slate-700 mb-2">
+                        Inner Blue Border (Finished Width): <span id="blueVal" class="text-indigo-600 ml-1"></span>
+                    </label>
+                    <input type="range" id="blueSlider" min="1.0" max="4.0" step="0.0625" value="2.5625" class="w-full accent-indigo-600 cursor-pointer">
+                    
+                    <div class="flex justify-between text-sm text-slate-600 font-medium mt-4 pt-4 border-t border-slate-200">
+                        <span>Outer Colored Border (Finished):</span>
+                        <span id="colorVal" class="text-orange-600 font-bold"></span>
+                    </div>
+                    <div class="flex justify-between text-sm text-slate-600 font-medium mt-2 pt-2 border-t border-slate-200">
+                        <span>Total Block (Unfinished):</span>
+                        <span class="font-bold"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline" style="font-size: 150%; vertical-align: middle;"><mn>12</mn><mspace width="0.15em" /><mfrac><mn>1</mn><mn>2</mn></mfrac></math>"</span>
+                    </div>
+                    <div class="flex justify-between text-sm text-slate-600 font-medium mt-2 pt-2 border-t border-slate-200">
+                        <span>Center Pansy (Unfinished):</span>
+                        <span class="text-fuchsia-800 font-bold"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline" style="font-size: 150%; vertical-align: middle;"><mn>7</mn><mspace width="0.15em" /><mfrac><mn>3</mn><mn>8</mn></mfrac></math>"</span>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="text-xl font-bold text-slate-800 mb-4">Cut List (Unfinished Sizes)</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-100 text-slate-600 text-sm">
+                                    <th class="p-3 border-b border-slate-200 font-semibold rounded-tl-lg">Piece</th>
+                                    <th class="p-3 border-b border-slate-200 font-semibold">Cut Width</th>
+                                    <th class="p-3 border-b border-slate-200 font-semibold rounded-tr-lg">Cut Length</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-sm" id="cutListBody">
+                                <tr class="border-b border-slate-100 hover:bg-slate-50 transition-all cursor-pointer" data-target="shape-pansy">
+                                    <td class="p-3 font-medium text-fuchsia-800 flex items-center gap-2">
+                                        <span class="w-3 h-3 rounded-full bg-fuchsia-800 inline-block"></span> Pansy Square
+                                    </td>
+                                    <td class="p-3"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline" style="font-size: 150%; vertical-align: middle;"><mn>7</mn><mspace width="0.15em" /><mfrac><mn>3</mn><mn>8</mn></mfrac></math>"</td>
+                                    <td class="p-3"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline" style="font-size: 150%; vertical-align: middle;"><mn>7</mn><mspace width="0.15em" /><mfrac><mn>3</mn><mn>8</mn></mfrac></math>"</td>
+                                </tr>
+                                <tr class="border-b border-slate-100 hover:bg-slate-50 transition-all cursor-pointer" data-target="shape-top-blue">
+                                    <td class="p-3 font-medium text-indigo-900 flex items-center gap-2">
+                                        <span class="w-3 h-3 rounded-full bg-indigo-900 inline-block"></span> Top Blue (Mitred)*
+                                    </td>
+                                    <td class="p-3" id="cutBlueW"></td>
+                                    <td class="p-3" id="cutBlueTopL"></td>
+                                </tr>
+                                <tr class="border-b border-slate-100 hover:bg-slate-50 transition-all cursor-pointer" data-target="shape-left-blue">
+                                    <td class="p-3 font-medium text-indigo-900 flex items-center gap-2">
+                                        <span class="w-3 h-3 rounded-full bg-indigo-900 inline-block"></span> Left Blue (Mitred)*
+                                    </td>
+                                    <td class="p-3" id="cutBlueW2"></td>
+                                    <td class="p-3" id="cutBlueLeftL"></td>
+                                </tr>
+                                <tr class="border-b border-slate-100 hover:bg-slate-50 transition-all cursor-pointer" data-target="shape-top-col">
+                                    <td class="p-3 font-medium text-orange-600 flex items-center gap-2">
+                                        <span class="w-3 h-3 rounded-full bg-orange-500 inline-block"></span> Top Colored
+                                    </td>
+                                    <td class="p-3" id="cutColW"></td>
+                                    <td class="p-3"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline" style="font-size: 150%; vertical-align: middle;"><mn>12</mn><mspace width="0.15em" /><mfrac><mn>1</mn><mn>2</mn></mfrac></math>"</td>
+                                </tr>
+                                <tr class="hover:bg-slate-50 transition-all cursor-pointer" data-target="shape-left-col">
+                                    <td class="p-3 font-medium text-orange-600 flex items-center gap-2">
+                                        <span class="w-3 h-3 rounded-full bg-orange-500 inline-block"></span> Left Colored
+                                    </td>
+                                    <td class="p-3" id="cutColW2"></td>
+                                    <td class="p-3" id="cutColLeftL"></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-2">* Length for mitred pieces is measured along the longest outer edge.</p>
+                </div>
+            </div>
+
+            <!-- Preview Graphic -->
+            <div class="flex items-center justify-center">
+                <div class="w-full max-w-md">
+                    <div class="quilt-container rounded-sm shadow-2xl border border-slate-300" id="previewBox">
+                        <svg id="quilt-svg" viewBox="0 0 1000 1000" class="w-full h-full block">
+                            <defs>
+                                <pattern id="pattern-colored" width="40" height="40" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                                    <rect width="40" height="40" fill="#f97316"/>
+                                    <line x1="0" y1="0" x2="0" y2="40" stroke="rgba(255,255,255,0.15)" stroke-width="20"/>
+                                </pattern>
+                                <radialGradient id="pattern-pansy" cx="50%" cy="50%" r="70%">
+                                    <stop offset="0%" stop-color="#86198f"/>
+                                    <stop offset="100%" stop-color="#4a044e"/>
+                                </radialGradient>
+                            </defs>
+                            
+                            <!-- Shapes -->
+                            <rect id="shape-left-col" class="piece-shape" fill="url(#pattern-colored)" />
+                            <rect id="shape-top-col" class="piece-shape" fill="url(#pattern-colored)" />
+                            <polygon id="shape-left-blue" class="piece-shape" fill="#1e3a8a" />
+                            <polygon id="shape-top-blue" class="piece-shape" fill="#1e3a8a" />
+                            <rect id="shape-pansy" class="piece-shape" fill="url(#pattern-pansy)" />
+                        </svg>
+
+                        <!-- Pansy Square Center Text Overlay -->
+                        <div id="pansy-overlay">
+                            <div class="flex flex-col items-center">
+                                <svg class="w-8 h-8 mb-1 opacity-75" fill="currentColor" viewBox="0 0 24 24"><path d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10zm0-2a8 8 0 100-16 8 8 0 000 16zm-3.5-6a2.5 2.5 0 110-5 2.5 2.5 0 010 5zm7 0a2.5 2.5 0 110-5 2.5 2.5 0 010 5zm-3.5 3a2.5 2.5 0 110-5 2.5 2.5 0 010 5z"/></svg>
+                                <span class="text-sm drop-shadow-md">Pansy Center</span>
+                                <span class="text-xs opacity-90 drop-shadow-md"><math xmlns="http://www.w3.org/1998/Math/MathML" display="inline" style="font-size: 150%; vertical-align: middle;"><mn>7</mn><mspace width="0.15em" /><mfrac><mn>3</mn><mn>8</mn></mfrac></math>" cut</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const slider = document.getElementById('blueSlider');
+            
+            function formatFractions(decimal) {
+                const whole = Math.floor(decimal);
+                const frac = decimal - whole;
+                let num = 0, den = 1;
+
+                // Use a tiny epsilon value to safely compare floating point numbers
+                if (Math.abs(frac - 0) < 0.001) { num = 0; }
+                else if (Math.abs(frac - 0.0625) < 0.001) { num = 1; den = 16; }
+                else if (Math.abs(frac - 0.125) < 0.001) { num = 1; den = 8; }
+                else if (Math.abs(frac - 0.1875) < 0.001) { num = 3; den = 16; }
+                else if (Math.abs(frac - 0.25) < 0.001) { num = 1; den = 4; }
+                else if (Math.abs(frac - 0.3125) < 0.001) { num = 5; den = 16; }
+                else if (Math.abs(frac - 0.375) < 0.001) { num = 3; den = 8; }
+                else if (Math.abs(frac - 0.4375) < 0.001) { num = 7; den = 16; }
+                else if (Math.abs(frac - 0.5) < 0.001) { num = 1; den = 2; }
+                else if (Math.abs(frac - 0.5625) < 0.001) { num = 9; den = 16; }
+                else if (Math.abs(frac - 0.625) < 0.001) { num = 5; den = 8; }
+                else if (Math.abs(frac - 0.6875) < 0.001) { num = 11; den = 16; }
+                else if (Math.abs(frac - 0.75) < 0.001) { num = 3; den = 4; }
+                else if (Math.abs(frac - 0.8125) < 0.001) { num = 13; den = 16; }
+                else if (Math.abs(frac - 0.875) < 0.001) { num = 7; den = 8; }
+                else if (Math.abs(frac - 0.9375) < 0.001) { num = 15; den = 16; }
+                else return parseFloat(decimal).toFixed(3) + '"';
+
+                if (whole === 0 && num === 0) return '0"';
+
+                // Construct MathML Output
+                let mathml = `<math xmlns="http://www.w3.org/1998/Math/MathML" display="inline" style="font-size: 150%; vertical-align: middle;">`;
+                if (whole !== 0) {
+                    mathml += `<mn>${whole}</mn>`;
+                }
+                if (num !== 0) {
+                    // Add slight spacing between whole number and fraction
+                    if (whole !== 0) mathml += `<mspace width="0.15em" />`;
+                    mathml += `<mfrac><mn>${num}</mn><mn>${den}</mn></mfrac>`;
+                }
+                mathml += `</math>"`;
+                
+                return mathml;
+            }
+
+            function updateCalculator() {
+                // 1. Core Variables based on user input
+                const W_b = parseFloat(slider.value);
+                const W_c = 5.125 - W_b; 
+                
+                // 2. Cut Sizes (Adding 0.5" for seam allowances on all pieces)
+                const blueCutW = W_b + 0.5;
+                const blueCutL = 7.875 + W_b;
+                
+                const colCutW = W_c + 0.5;
+                const colLeftL = 12.5 - W_c; 
+
+                // 3. Update DOM Labels (Using innerHTML for MathML parsing)
+                document.getElementById('blueVal').innerHTML = formatFractions(W_b);
+                document.getElementById('colorVal').innerHTML = formatFractions(W_c);
+                
+                // 4. Update DOM Cut Sizes
+                document.getElementById('cutBlueW').innerHTML = formatFractions(blueCutW);
+                document.getElementById('cutBlueW2').innerHTML = formatFractions(blueCutW);
+                document.getElementById('cutBlueTopL').innerHTML = formatFractions(blueCutL);
+                document.getElementById('cutBlueLeftL').innerHTML = formatFractions(blueCutL);
+                
+                document.getElementById('cutColW').innerHTML = formatFractions(colCutW);
+                document.getElementById('cutColW2').innerHTML = formatFractions(colCutW);
+                document.getElementById('cutColLeftL').innerHTML = formatFractions(colLeftL);
+
+                // 5. Update Visual Preview using SVG coordinate mapping (1000x1000 viewBox)
+                const total = 12.5; 
+                
+                const C = (W_c / total) * 1000;
+                const B = (W_b / total) * 1000;
+                const P = (7.375 / total) * 100; // Overlay uses percentage
+
+                // Top Colored (Spans full width)
+                const sTopCol = document.getElementById('shape-top-col');
+                sTopCol.setAttribute('x', '0');
+                sTopCol.setAttribute('y', '0');
+                sTopCol.setAttribute('width', '1000');
+                sTopCol.setAttribute('height', C);
+
+                // Left Colored (Tucks under top colored)
+                const sLeftCol = document.getElementById('shape-left-col');
+                sLeftCol.setAttribute('x', '0');
+                sLeftCol.setAttribute('y', C);
+                sLeftCol.setAttribute('width', C);
+                sLeftCol.setAttribute('height', 1000 - C);
+                
+                // Top Blue (Mitred)
+                const sTopBlue = document.getElementById('shape-top-blue');
+                sTopBlue.setAttribute('points', `${C},${C} 1000,${C} 1000,${C+B} ${C+B},${C+B}`);
+
+                // Left Blue (Mitred)
+                const sLeftBlue = document.getElementById('shape-left-blue');
+                sLeftBlue.setAttribute('points', `${C},${C} ${C+B},${C+B} ${C+B},1000 ${C},1000`);
+
+                // Pansy
+                const sPansy = document.getElementById('shape-pansy');
+                sPansy.setAttribute('x', C+B);
+                sPansy.setAttribute('y', C+B);
+                sPansy.setAttribute('width', 1000 - C - B);
+                sPansy.setAttribute('height', 1000 - C - B);
+
+                // Update HTML Overlay for Pansy Text
+                const pansyOverlay = document.getElementById('pansy-overlay');
+                pansyOverlay.style.width = P + '%';
+                pansyOverlay.style.height = P + '%';
+            }
+
+            // Hover Highlight Handlers (Fixed to not re-order DOM, avoiding sticky hovers)
+            function highlightPiece(targetId) {
+                // Clear all existing highlights first
+                unhighlightAll();
+
+                const shape = document.getElementById(targetId);
+                if (shape) shape.classList.add('marquee');
+                
+                const row = document.querySelector(`tr[data-target="${targetId}"]`);
+                if (row) row.classList.add('bg-amber-50');
+            }
+
+            function unhighlightAll() {
+                document.querySelectorAll('.piece-shape').forEach(el => el.classList.remove('marquee'));
+                document.querySelectorAll('tr[data-target]').forEach(el => el.classList.remove('bg-amber-50'));
+            }
+
+            // Bind events to table rows
+            document.querySelectorAll('tr[data-target]').forEach(row => {
+                const targetId = row.getAttribute('data-target');
+                row.addEventListener('mouseenter', () => highlightPiece(targetId));
+                row.addEventListener('mouseleave', unhighlightAll);
+            });
+
+            // Bind events to SVG shapes
+            document.querySelectorAll('.piece-shape').forEach(shape => {
+                const targetId = shape.id;
+                shape.addEventListener('mouseenter', () => highlightPiece(targetId));
+                shape.addEventListener('mouseleave', unhighlightAll);
+            });
+
+            // Listen for slider changes
+            slider.addEventListener('input', updateCalculator);
+            
+            // Initialize on load
+            updateCalculator();
+        });
+    </script>
+</body>
+</html>
