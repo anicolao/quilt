@@ -1,0 +1,133 @@
+name: Pull Request Preview
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - closed
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: pr-preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  deploy-preview:
+    if: github.event.action != 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout pull request
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Publish preview
+        id: publish
+        run: |
+          pr_number="${{ github.event.pull_request.number }}"
+          repo_name="${GITHUB_REPOSITORY#*/}"
+          preview_path="previews/pr-${pr_number}"
+          preview_url="https://${GITHUB_REPOSITORY_OWNER}.github.io/${repo_name}/${preview_path}/"
+          work_dir="$(mktemp -d)"
+
+          git clone --depth=1 --branch gh-pages "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$work_dir"
+          rm -rf "$work_dir/$preview_path"
+          mkdir -p "$work_dir/$preview_path"
+          cp -R dist/. "$work_dir/$preview_path"/
+          touch "$work_dir/.nojekyll"
+
+          cd "$work_dir"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .
+          if git diff --cached --quiet; then
+            echo "No preview changes to publish."
+          else
+            git commit -m "Deploy preview for PR #${pr_number}"
+            git push origin gh-pages
+          fi
+
+          echo "url=$preview_url" >> "$GITHUB_OUTPUT"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Comment preview link
+        run: |
+          preview_url="${{ steps.publish.outputs.url }}"
+          pr_number="${{ github.event.pull_request.number }}"
+          body="$(cat <<BODY
+          <!-- quilt-pr-preview -->
+          Preview: ${preview_url}
+
+          Updated for commit ${{ github.event.pull_request.head.sha }}.
+          BODY
+          )"
+
+          comment_id="$(gh api "repos/${GITHUB_REPOSITORY}/issues/${pr_number}/comments" --paginate --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | contains("<!-- quilt-pr-preview -->"))) | .id' | tail -n 1)"
+          if [ -n "$comment_id" ]; then
+            gh api -X PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${comment_id}" -f body="$body" >/dev/null
+          else
+            gh pr comment "$pr_number" --body "$body"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  cleanup-preview:
+    if: github.event.action == 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Remove preview
+        run: |
+          pr_number="${{ github.event.pull_request.number }}"
+          preview_path="previews/pr-${pr_number}"
+          work_dir="$(mktemp -d)"
+
+          git clone --depth=1 --branch gh-pages "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$work_dir"
+          rm -rf "$work_dir/$preview_path"
+
+          cd "$work_dir"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .
+          if git diff --cached --quiet; then
+            echo "No preview to remove."
+          else
+            git commit -m "Remove preview for PR #${pr_number}"
+            git push origin gh-pages
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update preview comment
+        run: |
+          pr_number="${{ github.event.pull_request.number }}"
+          body="$(cat <<BODY
+          <!-- quilt-pr-preview -->
+          Preview removed because this pull request is closed.
+          BODY
+          )"
+
+          comment_id="$(gh api "repos/${GITHUB_REPOSITORY}/issues/${pr_number}/comments" --paginate --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | contains("<!-- quilt-pr-preview -->"))) | .id' | tail -n 1)"
+          if [ -n "$comment_id" ]; then
+            gh api -X PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${comment_id}" -f body="$body" >/dev/null
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
