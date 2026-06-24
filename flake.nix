@@ -27,6 +27,7 @@
               git
               gh
               nodejs_22
+              python3
             ];
           };
         });
