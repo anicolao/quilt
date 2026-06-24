@@ -1,0 +1,15 @@
+{
+  "name": "quilt",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "mkdir -p dist && cp quilt.html dist/index.html",
+    "preview": "vite preview --host 127.0.0.1",
+    "check": "npm run build"
+  },
+  "devDependencies": {
+    "vite": "^8.1.0"
+  }
+}
